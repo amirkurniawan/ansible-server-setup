@@ -1,0 +1,96 @@
+---
+# Role: app
+# Deploy static website from tarball or git repository
+
+# Method 1: Deploy from tarball
+- name: Deploy from tarball
+  block:
+    - name: Ensure unzip and tar are installed
+      apt:
+        name:
+          - unzip
+          - tar
+        state: present
+
+    - name: Copy website tarball to server
+      copy:
+        src: "{{ app_source }}"
+        dest: "/tmp/website.tar.gz"
+        mode: '0644'
+
+    - name: Create web directory
+      file:
+        path: "{{ nginx_root }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Extract website tarball
+      unarchive:
+        src: "/tmp/website.tar.gz"
+        dest: "{{ nginx_root }}"
+        remote_src: yes
+        owner: www-data
+        group: www-data
+        extra_opts:
+          - --strip-components=1
+      ignore_errors: yes
+
+    - name: Set ownership of web files
+      file:
+        path: "{{ nginx_root }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        recurse: yes
+
+    - name: Cleanup tarball
+      file:
+        path: "/tmp/website.tar.gz"
+        state: absent
+
+  when: app_deploy_method == "tarball"
+  tags: tarball
+
+# Method 2: Deploy from Git repository (Stretch Goal)
+- name: Deploy from Git
+  block:
+    - name: Ensure git is installed
+      apt:
+        name: git
+        state: present
+
+    - name: Clone/update git repository
+      git:
+        repo: "{{ app_git_repo }}"
+        dest: "{{ nginx_root }}"
+        version: "{{ app_git_branch }}"
+        force: yes
+      become_user: www-data
+
+    - name: Set ownership of web files
+      file:
+        path: "{{ nginx_root }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        recurse: yes
+
+  when: app_deploy_method == "git"
+  tags: git
+
+# Create default index.html if none exists
+- name: Check if index.html exists
+  stat:
+    path: "{{ nginx_root }}/index.html"
+  register: index_file
+
+- name: Create default index.html
+  template:
+    src: index.html.j2
+    dest: "{{ nginx_root }}/index.html"
+    owner: www-data
+    group: www-data
+    mode: '0644'
+  when: not index_file.stat.exists

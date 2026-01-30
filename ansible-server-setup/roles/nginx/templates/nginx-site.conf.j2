@@ -1,0 +1,35 @@
+# Nginx Site Configuration
+# Managed by Ansible
+
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name {{ nginx_server_name }} {{ ansible_host }};
+
+    root {{ nginx_root }};
+    index index.html index.htm;
+
+    access_log /var/log/nginx/{{ app_name }}.access.log;
+    error_log /var/log/nginx/{{ app_name }}.error.log;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # Cache static assets
+    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Deny access to hidden files
+    location ~ /\. {
+        deny all;
+    }
+}

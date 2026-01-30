@@ -1,0 +1,56 @@
+---
+# Role: base
+# Basic server setup - updates, utilities, fail2ban
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  tags: update
+
+- name: Upgrade all packages
+  apt:
+    upgrade: dist
+    autoremove: yes
+  tags: update
+
+- name: Install base packages
+  apt:
+    name: "{{ base_packages }}"
+    state: present
+  tags: packages
+
+- name: Set timezone
+  timezone:
+    name: "{{ timezone }}"
+  tags: timezone
+
+- name: Install fail2ban
+  apt:
+    name: fail2ban
+    state: present
+  tags: fail2ban
+
+- name: Configure fail2ban
+  template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    mode: '0644'
+  notify: restart fail2ban
+  tags: fail2ban
+
+- name: Enable and start fail2ban
+  systemd:
+    name: fail2ban
+    enabled: yes
+    state: started
+  tags: fail2ban
+
+- name: Set proper permissions for /var/www
+  file:
+    path: /var/www
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+  tags: permissions

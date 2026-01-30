@@ -1,0 +1,40 @@
+---
+# Global Variables
+# Customize these for your environment
+
+# System
+timezone: "Asia/Jakarta"
+
+# SSH
+ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample your-email@example.com"
+# Or use file: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+
+# Nginx
+nginx_server_name: "amirkurniawan.store"
+nginx_root: "/var/www/html"
+
+# App deployment
+app_name: "mywebsite"
+app_source: "files/website.tar.gz"  # Local tarball
+# Or for GitHub:
+app_git_repo: "https://github.com/amirkurniawan/devops-labs.git"
+app_git_branch: "main"
+app_deploy_method: "tarball"  # Options: tarball, git
+
+# fail2ban
+fail2ban_maxretry: 3
+fail2ban_bantime: 3600
+fail2ban_findtime: 600
+
+# Packages to install
+base_packages:
+  - curl
+  - wget
+  - git
+  - htop
+  - vim
+  - unzip
+  - tar
+  - net-tools
+  - tree
+  - ncdu

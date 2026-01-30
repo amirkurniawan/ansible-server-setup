@@ -1,0 +1,31 @@
+---
+# Role: ssh
+# Add SSH public key to authorized_keys
+
+- name: Ensure .ssh directory exists
+  file:
+    path: "/home/{{ ansible_user }}/.ssh"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0700'
+
+- name: Add SSH public key to authorized_keys
+  authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: "{{ ssh_public_key }}"
+  when: ssh_public_key is defined and ssh_public_key | length > 0
+
+- name: Add SSH public key from file (alternative)
+  authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: "{{ lookup('file', ssh_public_key_file) }}"
+  when: ssh_public_key_file is defined
+
+- name: Ensure SSH service is running
+  systemd:
+    name: ssh
+    enabled: yes
+    state: started

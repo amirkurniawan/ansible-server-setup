@@ -1,0 +1,47 @@
+---
+# Ansible Playbook - Server Configuration
+# Project: https://roadmap.sh/projects/configuration-management
+#
+# Usage:
+#   ansible-playbook setup.yml                    # Run all roles
+#   ansible-playbook setup.yml --tags "base"      # Run only base role
+#   ansible-playbook setup.yml --tags "nginx"     # Run only nginx role
+#   ansible-playbook setup.yml --tags "app"       # Run only app role
+#   ansible-playbook setup.yml --tags "ssh"       # Run only ssh role
+#   ansible-playbook setup.yml --tags "base,nginx" # Run multiple roles
+
+- name: Configure Web Server
+  hosts: webservers
+  become: yes
+  gather_facts: yes
+
+  vars_files:
+    - group_vars/all.yml
+
+  pre_tasks:
+    - name: Display server info
+      debug:
+        msg: "Configuring {{ inventory_hostname }} ({{ ansible_host }})"
+      tags: always
+
+  roles:
+    - role: base
+      tags: base
+
+    - role: ssh
+      tags: ssh
+
+    - role: nginx
+      tags: nginx
+
+    - role: app
+      tags: app
+
+  post_tasks:
+    - name: Display completion message
+      debug:
+        msg: |
+          ✅ Server configuration complete!
+          🌐 Website: http://{{ ansible_host }}
+          📊 Services: nginx, fail2ban
+      tags: always
