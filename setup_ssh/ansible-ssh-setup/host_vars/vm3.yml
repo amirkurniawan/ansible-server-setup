@@ -1,0 +1,6 @@
+---
+# Host Variables untuk vm3
+# Encrypt file ini: ansible-vault encrypt host_vars/vm3.yml
+
+ansible_ssh_pass: "password-vm3"
+ansible_become_pass: "password-sudo-vm3"

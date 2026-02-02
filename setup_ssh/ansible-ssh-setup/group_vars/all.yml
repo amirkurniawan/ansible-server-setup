@@ -1,0 +1,12 @@
+---
+# Group Variables - Public Settings
+# Variabel yang tidak sensitif
+
+# Path ke SSH private key untuk koneksi awal
+ssh_private_key_path: "~/.ssh/id_work"
+
+# Path ke public key yang akan di-deploy
+ssh_public_key_file: "~/.ssh/id_work.pub"
+
+# Backup authorized_keys sebelum update
+backup_authorized_keys: true

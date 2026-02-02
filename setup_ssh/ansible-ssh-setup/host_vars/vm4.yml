@@ -1,0 +1,6 @@
+---
+# Host Variables untuk vm4
+# Encrypt file ini: ansible-vault encrypt host_vars/vm4.yml
+
+ansible_ssh_pass: "password-vm4"
+ansible_become_pass: "password-sudo-vm4"

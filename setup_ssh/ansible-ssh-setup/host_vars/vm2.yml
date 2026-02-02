@@ -1,0 +1,6 @@
+---
+# Host Variables untuk vm2
+# Encrypt file ini: ansible-vault encrypt host_vars/vm2.yml
+
+ansible_ssh_pass: "password-vm2"
+ansible_become_pass: "password-sudo-vm2"

@@ -1,0 +1,6 @@
+---
+# Host Variables untuk vm7
+# Encrypt file ini: ansible-vault encrypt host_vars/vm7.yml
+
+ansible_ssh_pass: "password-vm7"
+ansible_become_pass: "password-sudo-vm7"

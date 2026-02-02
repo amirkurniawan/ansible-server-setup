@@ -1,0 +1,34 @@
+---
+# Playbook: Test SSH Connectivity
+# Cek koneksi ke semua server sebelum deploy
+#
+# Usage:
+#   ansible-playbook test-connection.yml --ask-vault-pass
+#   ansible-playbook test-connection.yml --limit vm1 --ask-vault-pass
+
+- name: Test SSH Connection to All Servers
+  hosts: all_servers
+  gather_facts: yes
+
+  vars_files:
+    - group_vars/all.yml
+    - secrets.yml
+
+  # Use password from secrets.yml for initial setup
+  vars:
+    ansible_ssh_pass: "{{ ansible_ssh_pass | default(omit) }}"
+    ansible_become_pass: "{{ ansible_become_pass | default(omit) }}"
+
+  tasks:
+    - name: Ping test
+      ping:
+      register: ping_result
+
+    - name: Display connection info
+      debug:
+        msg: |
+          ✅ Connected to {{ inventory_hostname }}
+          📍 Host: {{ ansible_host }}
+          👤 User: {{ ansible_user }}
+          🖥️  OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          🏠 Hostname: {{ ansible_hostname }}
