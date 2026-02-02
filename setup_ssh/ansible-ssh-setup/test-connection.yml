@@ -15,9 +15,9 @@
     - secrets.yml
 
   # Use password from secrets.yml for initial setup
-  vars:
-    ansible_ssh_pass: "{{ ansible_ssh_pass | default(omit) }}"
-    ansible_become_pass: "{{ ansible_become_pass | default(omit) }}"
+  # vars:
+  #   ansible_ssh_pass: "{{ ansible_ssh_pass | default(omit) }}"
+  #   ansible_become_pass: "{{ ansible_become_pass | default(omit) }}"
 
   tasks:
     - name: Ping test
