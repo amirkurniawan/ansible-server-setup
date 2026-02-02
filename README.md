@@ -1,488 +1,461 @@
-# Ansible SSH Key Setup
+# Ansible Server Configuration
 
-Deploy SSH public key ke multiple servers dengan Ansible.
+Automate server setup menggunakan Ansible untuk configuration management.
+
+Project reference: [roadmap.sh/projects/configuration-management](https://roadmap.sh/projects/configuration-management)
+
+---
+
+## Kenapa Harus Ansible?
+
+### Masalah Tanpa Configuration Management
+
+```
+Manual Setup = Masalah!
+
+Server 1: Install nginx, configure, deploy app... ✅ (30 menit)
+Server 2: Install nginx, configure, deploy app... ✅ (30 menit)  
+Server 3: Install nginx, configure, deploy app... ❌ (Lupa 1 step!)
+Server 4: Install nginx, configure, deploy app... ✅ (30 menit)
+...
+Server 100: 😱 (50 jam kerja, banyak error!)
+```
+
+### Solusi: Ansible
+
+```
+Dengan Ansible:
+
+ansible-playbook setup.yml
+
+Server 1: ✅ (otomatis)
+Server 2: ✅ (otomatis)
+Server 3: ✅ (otomatis)
+Server 4: ✅ (otomatis)
+...
+Server 100: ✅ (semua sama, 5 menit!)
+```
+
+---
+
+## Keuntungan Menggunakan Ansible
+
+| Keuntungan | Penjelasan |
+|------------|------------|
+| **Agentless** | Tidak perlu install software apapun di server target. Cukup SSH! |
+| **Idempotent** | Jalankan berkali-kali, hasilnya tetap sama. Aman untuk di-run ulang. |
+| **Human Readable** | Pakai YAML, mudah dibaca dan dipahami |
+| **Version Control** | Simpan di Git, track perubahan, rollback jika error |
+| **Reusable** | Buat sekali, pakai di banyak server/project |
+| **Scalable** | 1 server atau 1000 server? Sama saja! |
+| **Dokumentasi Hidup** | Playbook = dokumentasi setup server yang selalu up-to-date |
+
+### Perbandingan Manual vs Ansible
+
+| Aspek | Manual | Ansible |
+|-------|--------|---------|
+| Setup 1 server | 30 menit | 30 menit (pertama kali) |
+| Setup 10 server | 5 jam | 5 menit |
+| Setup 100 server | 50 jam | 5 menit |
+| Konsistensi | ❌ Human error | ✅ Selalu sama |
+| Dokumentasi | ❌ Sering outdated | ✅ Playbook = docs |
+| Reproducible | ❌ Susah | ✅ Mudah |
+| Rollback | ❌ Manual | ✅ Git revert |
+| Audit trail | ❌ Tidak ada | ✅ Git history |
+
+### Kapan Harus Pakai Ansible?
+
+✅ **Pakai Ansible jika:**
+- Manage lebih dari 1 server
+- Setup server yang sama berulang kali
+- Butuh konsistensi antar environment (dev, staging, prod)
+- Ingin dokumentasi yang selalu up-to-date
+- Bekerja dalam tim
+
+❌ **Mungkin tidak perlu jika:**
+- Hanya 1 server yang jarang diubah
+- One-time setup yang tidak akan diulang
+- Belajar Linux basic (manual dulu biar paham)
+
+---
+
+## Apa itu Ansible?
+
+Ansible adalah **configuration management tool** yang memungkinkan kamu untuk:
+- Automate server setup
+- Manage multiple servers sekaligus
+- Reproducible infrastructure (Infrastructure as Code)
+- Agentless (tidak perlu install agent di server)
+
+```
+┌─────────────────┐      SSH      ┌─────────────────┐
+│   Control Node  │ ───────────► │  Target Server  │
+│   (Laptop)      │              │  (VM/Cloud)     │
+│                 │              │                 │
+│  ansible-playbook setup.yml    │  ✅ Updated     │
+│                 │              │  ✅ Nginx       │
+│                 │              │  ✅ App deployed│
+└─────────────────┘              └─────────────────┘
+```
+
+### Ansible vs Tools Lain
+
+| Tool | Agentless | Bahasa | Learning Curve |
+|------|-----------|--------|----------------|
+| **Ansible** | ✅ Ya | YAML | Mudah |
+| Puppet | ❌ Agent | DSL | Sedang |
+| Chef | ❌ Agent | Ruby | Sulit |
+| SaltStack | Optional | YAML | Sedang |
+| Terraform | ✅ Ya | HCL | Sedang |
+
+**Ansible paling cocok untuk pemula** karena:
+- Tidak perlu install agent
+- YAML mudah dibaca
+- Dokumentasi lengkap
+- Komunitas besar
 
 ---
 
 ## Project Structure
 
 ```
-ansible-ssh-setup/
-├── ansible.cfg          # Ansible configuration
-├── inventory.ini        # Daftar 7 VMs (EDIT INI)
+ansible-server-setup/
+├── ansible.cfg           # Ansible configuration
+├── inventory.ini         # Target servers list
+├── setup.yml            # Main playbook
 ├── group_vars/
-│   └── all.yml          # Public variables
-├── secrets.yml          # SSH key & secrets (ENCRYPT INI)
-├── setup-ssh.yml        # Main playbook
-├── test-connection.yml  # Test koneksi
-└── README.md
+│   └── all.yml          # Global variables
+└── roles/
+    ├── base/            # Basic server setup
+    │   ├── tasks/
+    │   ├── handlers/
+    │   └── templates/
+    ├── ssh/             # SSH key management
+    │   └── tasks/
+    ├── nginx/           # Nginx installation
+    │   ├── tasks/
+    │   ├── handlers/
+    │   └── templates/
+    └── app/             # App deployment
+        ├── tasks/
+        ├── templates/
+        └── files/
+```
+
+---
+
+## Roles
+
+| Role | Fungsi |
+|------|--------|
+| `base` | Update system, install utilities, setup fail2ban |
+| `ssh` | Add SSH public key to authorized_keys |
+| `nginx` | Install & configure Nginx web server |
+| `app` | Deploy static website (tarball atau git) |
+
+---
+
+## Prerequisites
+
+### 1. Install Ansible di Control Node (laptop)
+
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install ansible -y
+
+# Verify
+ansible --version
+```
+
+### 2. SSH Access ke Target Server
+
+Pastikan bisa SSH ke server:
+```bash
+ssh gitlabadmin@192.168.246.30
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Edit Inventory (Wajib!)
+### 1. Clone/Download Project
+
+```bash
+git clone https://github.com/amirkurniawan/ansible-server-setup.git
+cd ansible-server-setup
+```
+
+### 2. Edit Inventory
 
 ```bash
 nano inventory.ini
 ```
 
-Sesuaikan IP dan username untuk 7 VM kamu:
-
+Sesuaikan IP dan user:
 ```ini
-[all_servers]
-gitlab     ansible_host=192.168.246.30 ansible_user=gitlabadmin
-jenkins    ansible_host=192.168.246.31 ansible_user=jenkins
-k8s-master ansible_host=192.168.246.32 ansible_user=kubeadmin
-k8s-node1  ansible_host=192.168.246.33 ansible_user=kubeadmin
-docker     ansible_host=192.168.246.34 ansible_user=dockeradmin
-registry   ansible_host=192.168.246.35 ansible_user=registry
-monitoring ansible_host=192.168.246.36 ansible_user=admin
+[webservers]
+server1 ansible_host=192.168.246.30 ansible_user=gitlabadmin
+
+[webservers:vars]
+ansible_ssh_private_key_file=~/.ssh/id_work
 ```
 
----
-
-### 2. Edit Secrets (Wajib!)
+### 3. Edit Variables
 
 ```bash
-nano secrets.yml
+nano group_vars/all.yml
 ```
 
-Copy isi dari `~/.ssh/id_work.pub`:
-
-```bash
-# Lihat public key kamu
-cat ~/.ssh/id_work.pub
-```
-
-Paste ke `secrets.yml`:
-
+Sesuaikan:
 ```yaml
----
-# SSH Public Key yang akan di-deploy
-ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5XXXXXX your-email@example.com"
-
-# SSH Password untuk initial setup (sebelum key ter-deploy)
-# Hapus setelah SSH key berhasil di-deploy!
-ansible_ssh_pass: "password-ssh-kamu"
-ansible_become_pass: "password-sudo-kamu"
+ssh_public_key: "ssh-ed25519 AAAA... your-email@example.com"
+nginx_server_name: "yourdomain.com"
 ```
 
-> ⚠️ **Catatan:** `ansible_ssh_pass` hanya dibutuhkan untuk **initial setup** saat SSH key belum ada di server. Setelah SSH key ter-deploy, hapus password dari secrets.yml!
-
----
-
-### 3. Encrypt Secrets (Wajib!)
+### 4. Test Connection
 
 ```bash
-# Encrypt secrets.yml
-ansible-vault encrypt secrets.yml
-
-# Masukkan password vault, INGAT PASSWORD INI!
-New Vault password: 
-Confirm New Vault password:
+ansible all -m ping
 ```
 
-Setelah di-encrypt, isi file akan terlihat seperti:
+Output yang diharapkan:
 ```
-$ANSIBLE_VAULT;1.1;AES256
-61626364656667686970...
+server1 | SUCCESS => {
+    "ping": "pong"
+}
+```
+
+### 5. Run Playbook
+
+```bash
+# Run semua roles
+ansible-playbook setup.yml
+
+# Atau dry-run dulu (check mode)
+ansible-playbook setup.yml --check
 ```
 
 ---
 
-### Ansible Vault Commands (Manage Secrets)
+## Usage
 
-| Command | Fungsi |
-|---------|--------|
-| `ansible-vault encrypt secrets.yml` | Encrypt file |
-| `ansible-vault decrypt secrets.yml` | Decrypt file (untuk edit) |
-| `ansible-vault edit secrets.yml` | Edit langsung tanpa decrypt manual |
-| `ansible-vault view secrets.yml` | Lihat isi tanpa decrypt |
-| `ansible-vault rekey secrets.yml` | Ganti password vault |
-
-#### Encrypt (pertama kali)
-```bash
-ansible-vault encrypt secrets.yml
-```
-
-#### Decrypt (untuk edit manual)
-```bash
-# Decrypt
-ansible-vault decrypt secrets.yml
-
-# Edit seperti biasa
-nano secrets.yml
-
-# Encrypt lagi setelah selesai
-ansible-vault encrypt secrets.yml
-```
-
-#### Edit langsung (tanpa decrypt manual)
-```bash
-# Lebih aman - file tetap encrypted setelah save
-ansible-vault edit secrets.yml
-```
-
-#### View tanpa decrypt
-```bash
-ansible-vault view secrets.yml
-```
-
-#### Ganti password vault
-```bash
-ansible-vault rekey secrets.yml
-```
-
----
-
-### 4. Test Koneksi Dulu
+### Run All Roles
 
 ```bash
-# Test semua server
-ansible all -m ping --ask-vault-pass
-
-# Atau pakai playbook
-ansible-playbook test-connection.yml --ask-vault-pass
+ansible-playbook setup.yml
 ```
 
----
-
-### 5. Deploy SSH Key
+### Run Specific Role
 
 ```bash
-# Dengan vault password
-ansible-playbook setup-ssh.yml --ask-vault-pass
+# Base role only (update, utilities, fail2ban)
+ansible-playbook setup.yml --tags "base"
 
-# Dry run dulu (check mode)
-ansible-playbook setup-ssh.yml --check --ask-vault-pass
+# Nginx role only
+ansible-playbook setup.yml --tags "nginx"
 
-# Hanya server tertentu
-ansible-playbook setup-ssh.yml --limit gitlab --ask-vault-pass
+# App deployment only
+ansible-playbook setup.yml --tags "app"
 
-# Beberapa server
-ansible-playbook setup-ssh.yml --limit "gitlab,jenkins,k8s-master" --ask-vault-pass
+# SSH key only
+ansible-playbook setup.yml --tags "ssh"
 ```
 
----
-
-## Initial Setup (SSH Key Belum Ada di Server)
-
-Jika ini **pertama kali** dan SSH key belum ter-deploy ke server (masih pakai password):
-
-### Option 1: Password di secrets.yml (Recommended)
-
-1. Tambahkan password ke `secrets.yml`:
-```yaml
----
-ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5XXXXXX your-email"
-
-# Password untuk initial setup
-ansible_ssh_pass: "password-ssh-kamu"
-ansible_become_pass: "password-sudo-kamu"
-```
-
-2. Encrypt secrets:
-```bash
-ansible-vault encrypt secrets.yml
-```
-
-3. Run playbook:
-```bash
-ansible-playbook setup-ssh.yml --ask-vault-pass
-```
-
-4. **Setelah berhasil**, hapus password dari secrets:
-```bash
-ansible-vault edit secrets.yml
-# Hapus baris ansible_ssh_pass dan ansible_become_pass
-```
-
-### Option 2: Password via Command Line
+### Run Multiple Roles
 
 ```bash
-# Install sshpass dulu
-sudo apt install sshpass -y
-
-# Run dengan prompt password
-ansible-playbook setup-ssh.yml --ask-pass --ask-become-pass
+ansible-playbook setup.yml --tags "base,nginx"
 ```
 
-- `--ask-pass` → prompt password SSH
-- `--ask-become-pass` → prompt password sudo
-
-### Option 3: Password Berbeda per Server
-
-Jika setiap server punya password berbeda, tambahkan di `inventory.ini`:
-
-```ini
-[all_servers]
-vm1 ansible_host=192.168.246.20 ansible_user=user1 ansible_ssh_pass=pass1
-vm2 ansible_host=192.168.246.31 ansible_user=user2 ansible_ssh_pass=pass2
-```
-
-⚠️ **Kurang secure** — gunakan hanya untuk initial setup, lalu hapus.
-
----
-
-## File yang Perlu Diedit
-
-| File | Apa yang Diedit |
-|------|-----------------|
-| `inventory.ini` | IP address dan username setiap VM |
-| `secrets.yml` | Isi SSH public key kamu |
-| `group_vars/all.yml` | Path ke SSH key (jika berbeda) |
-
----
-
-## Inventory Format
-
-```ini
-[all_servers]
-<nama_vm> ansible_host=<IP_ADDRESS> ansible_user=<SSH_USERNAME>
-```
-
-### Contoh Lengkap:
-
-```ini
-[all_servers]
-# GitLab Server
-gitlab ansible_host=192.168.246.30 ansible_user=gitlabadmin
-
-# Jenkins CI/CD
-jenkins ansible_host=192.168.246.31 ansible_user=jenkins
-
-# Kubernetes Cluster
-k8s-master ansible_host=192.168.246.32 ansible_user=kubeadmin
-k8s-node1  ansible_host=192.168.246.33 ansible_user=kubeadmin
-k8s-node2  ansible_host=192.168.246.34 ansible_user=kubeadmin
-
-# Docker Registry
-registry ansible_host=192.168.246.35 ansible_user=registry
-
-# Monitoring (Grafana, Prometheus)
-monitoring ansible_host=192.168.246.36 ansible_user=admin
-```
-
----
-
-## Ansible Vault Commands (Detail)
-
-### Encrypt File (Pertama Kali)
+### Skip Specific Role
 
 ```bash
-ansible-vault encrypt secrets.yml
-```
-
-Output:
-```
-New Vault password: 
-Confirm New Vault password:
-Encryption successful
-```
-
-### Decrypt File (Untuk Edit Manual)
-
-```bash
-# Decrypt dulu
-ansible-vault decrypt secrets.yml
-
-# Edit seperti biasa
-nano secrets.yml
-
-# JANGAN LUPA encrypt lagi!
-ansible-vault encrypt secrets.yml
-```
-
-### Edit Langsung (Recommended)
-
-```bash
-# File tetap encrypted setelah save
-ansible-vault edit secrets.yml
-```
-
-Akan membuka editor (default: vim). Setelah save & quit, file otomatis encrypted lagi.
-
-**Ganti editor default:**
-```bash
-# Pakai nano
-EDITOR=nano ansible-vault edit secrets.yml
-
-# Set permanent di .bashrc
-echo 'export EDITOR=nano' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### View Tanpa Decrypt
-
-```bash
-ansible-vault view secrets.yml
-```
-
-### Ganti Password Vault
-
-```bash
-ansible-vault rekey secrets.yml
-```
-
-### Simpan Password di File (Opsional)
-
-Supaya tidak perlu ketik password terus:
-
-```bash
-# Buat file password
-echo "your-vault-password" > .vault_pass
-chmod 600 .vault_pass
-
-# Tambahkan ke .gitignore
-echo ".vault_pass" >> .gitignore
-
-# Run tanpa prompt
-ansible-playbook setup-ssh.yml --vault-password-file .vault_pass
-```
-
-Atau set di `ansible.cfg`:
-```ini
-[defaults]
-vault_password_file = .vault_pass
-```
-
----
-
-## Usage Examples
-
-### Run ke Semua Server
-
-```bash
-ansible-playbook setup-ssh.yml --ask-vault-pass
-```
-
-### Run ke Server Tertentu
-
-```bash
-# Satu server
-ansible-playbook setup-ssh.yml --limit gitlab --ask-vault-pass
-
-# Beberapa server
-ansible-playbook setup-ssh.yml --limit "gitlab,jenkins" --ask-vault-pass
-```
-
-### Dry Run (Check Mode)
-
-```bash
-ansible-playbook setup-ssh.yml --check --ask-vault-pass
+ansible-playbook setup.yml --skip-tags "app"
 ```
 
 ### Verbose Output
 
 ```bash
-ansible-playbook setup-ssh.yml -v --ask-vault-pass    # verbose
-ansible-playbook setup-ssh.yml -vv --ask-vault-pass   # more verbose
+ansible-playbook setup.yml -v    # verbose
+ansible-playbook setup.yml -vv   # more verbose
+ansible-playbook setup.yml -vvv  # debug level
+```
+
+---
+
+## App Deployment Methods
+
+### Method 1: Tarball (Default)
+
+Edit `group_vars/all.yml`:
+```yaml
+app_deploy_method: "tarball"
+app_source: "files/website.tar.gz"
+```
+
+Letakkan tarball di `roles/app/files/website.tar.gz`
+
+### Method 2: Git Repository (Stretch Goal)
+
+Edit `group_vars/all.yml`:
+```yaml
+app_deploy_method: "git"
+app_git_repo: "https://github.com/username/repo.git"
+app_git_branch: "main"
+```
+
+---
+
+## Variables Reference
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `timezone` | Asia/Jakarta | Server timezone |
+| `ssh_public_key` | - | SSH public key to add |
+| `nginx_server_name` | - | Domain/server name |
+| `nginx_root` | /var/www/html | Web root directory |
+| `app_name` | mywebsite | Application name |
+| `app_deploy_method` | tarball | Deployment method (tarball/git) |
+| `fail2ban_maxretry` | 3 | Max login attempts |
+| `fail2ban_bantime` | 3600 | Ban duration (seconds) |
+
+---
+
+## Directory Explanation
+
+### ansible.cfg
+
+Konfigurasi Ansible:
+- Default inventory file
+- SSH settings
+- Privilege escalation
+
+### inventory.ini
+
+Daftar target servers:
+```ini
+[webservers]
+server1 ansible_host=192.168.246.30 ansible_user=gitlabadmin
+server2 ansible_host=192.168.246.31 ansible_user=ubuntu
+```
+
+### group_vars/all.yml
+
+Variables yang berlaku untuk semua hosts.
+
+### roles/
+
+Modular tasks yang bisa di-reuse.
+
+---
+
+## Output Example
+
+```
+PLAY [Configure Web Server] ************************************
+
+TASK [Display server info] *************************************
+ok: [server1] => 
+  msg: Configuring server1 (192.168.246.30)
+
+TASK [base : Update apt cache] *********************************
+ok: [server1]
+
+TASK [base : Install base packages] ****************************
+changed: [server1]
+
+TASK [base : Install fail2ban] *********************************
+ok: [server1]
+
+TASK [nginx : Install Nginx] ***********************************
+ok: [server1]
+
+TASK [nginx : Configure nginx site] ****************************
+changed: [server1]
+
+TASK [app : Extract website tarball] ***************************
+changed: [server1]
+
+TASK [Display completion message] ******************************
+ok: [server1] => 
+  msg: |-
+    ✅ Server configuration complete!
+    🌐 Website: http://192.168.246.30
+    📊 Services: nginx, fail2ban
+
+PLAY RECAP *****************************************************
+server1 : ok=15  changed=5  unreachable=0  failed=0  skipped=2
 ```
 
 ---
 
 ## Troubleshooting
 
-### Error: No inventory was parsed
+### Connection Failed
 
 ```bash
-# Pastikan ada inventory.ini
-ls -la inventory.ini
-
-# Atau specify manual
-ansible-playbook setup-ssh.yml -i inventory.ini
-```
-
-### Error: Permission denied (publickey)
-
-```bash
-# Test SSH manual dulu
+# Test SSH manually
 ssh -i ~/.ssh/id_work gitlabadmin@192.168.246.30
 
-# Pastikan path SSH key benar di group_vars/all.yml
-ssh_private_key_path: "~/.ssh/id_work"
+# Check inventory
+ansible-inventory --list
 ```
 
-### Error: Host key verification failed
+### Permission Denied (sudo)
+
+Pastikan user bisa sudo tanpa password:
+```bash
+# Di server
+sudo visudo
+# Tambahkan:
+gitlabadmin ALL=(ALL) NOPASSWD: ALL
+```
+
+### Module Not Found
 
 ```bash
-# Sudah dihandle di ansible.cfg, tapi jika masih error:
-ssh-keyscan 192.168.246.30 >> ~/.ssh/known_hosts
+# Install collection jika diperlukan
+ansible-galaxy collection install ansible.builtin
 ```
 
-### Error: Vault password required
+---
 
+## Add New Server
+
+1. Edit `inventory.ini`:
+```ini
+[webservers]
+server1 ansible_host=192.168.246.30 ansible_user=gitlabadmin
+server2 ansible_host=10.0.0.5 ansible_user=ubuntu  # NEW
+```
+
+2. Run playbook:
 ```bash
-# Tambahkan --ask-vault-pass
-ansible-playbook setup-ssh.yml --ask-vault-pass
-
-# Atau simpan password di file
-echo "your-vault-password" > .vault_pass
-chmod 600 .vault_pass
-ansible-playbook setup-ssh.yml --vault-password-file .vault_pass
+ansible-playbook setup.yml
 ```
+
+Semua server akan dikonfigurasi dengan setup yang sama!
 
 ---
 
-## Expected Output
+## What I Learned
 
-```
-PLAY [Setup SSH Keys on All Servers] ********************************
-
-TASK [Display target server info] ***********************************
-ok: [gitlab] => 
-  msg: 🖥️  Configuring gitlab (192.168.246.30) - User: gitlabadmin
-
-TASK [Ensure .ssh directory exists] *********************************
-ok: [gitlab]
-
-TASK [Backup existing authorized_keys] ******************************
-changed: [gitlab]
-
-TASK [Add SSH public key from secrets] ******************************
-changed: [gitlab]
-
-TASK [Ensure correct permissions on authorized_keys] ****************
-ok: [gitlab]
-
-TASK [Display success message] **************************************
-ok: [gitlab] => 
-  msg: ✅ SSH key deployed successfully to gitlab
-
-PLAY RECAP **********************************************************
-gitlab : ok=6  changed=2  unreachable=0  failed=0
-jenkins: ok=6  changed=2  unreachable=0  failed=0
-...
-```
+1. **Ansible Basics** - Inventory, playbooks, roles
+2. **Configuration Management** - Automate server setup
+3. **Idempotency** - Run multiple times, same result
+4. **Jinja2 Templates** - Dynamic configuration files
+5. **Role Structure** - Modular and reusable code
+6. **Tags** - Selective execution
 
 ---
 
-## Security Notes
+## References
 
-1. **Selalu encrypt `secrets.yml`** dengan ansible-vault
-2. **Jangan commit** `secrets.yml` yang tidak encrypted ke Git
-3. Tambahkan ke `.gitignore`:
-   ```
-   secrets.yml
-   .vault_pass
-   *.retry
-   ```
+- [Ansible Documentation](https://docs.ansible.com/)
+- [Ansible Best Practices](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
+- [Ansible Galaxy](https://galaxy.ansible.com/) - Pre-built roles
 
 ---
 
-## After Deployment
-
-Setelah SSH key ter-deploy, test login:
-
-```bash
-# Test ke setiap server
-ssh -i ~/.ssh/id_work gitlabadmin@192.168.246.30
-ssh -i ~/.ssh/id_work jenkins@192.168.246.31
-# ... dst
-```
-
----
-
-*Automate SSH key management dengan Ansible! 🔐*
+*Automate everything with Ansible! 🚀*
