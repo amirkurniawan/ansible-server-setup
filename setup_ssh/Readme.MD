@@ -59,18 +59,80 @@ cat ~/.ssh/id_work.pub
 Paste ke `secrets.yml`:
 
 ```yaml
+---
+# SSH Public Key yang akan di-deploy
 ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5XXXXXX your-email@example.com"
+
+# SSH Password untuk initial setup (sebelum key ter-deploy)
+# Hapus setelah SSH key berhasil di-deploy!
+ansible_ssh_pass: "password-ssh-kamu"
+ansible_become_pass: "password-sudo-kamu"
 ```
+
+> ⚠️ **Catatan:** `ansible_ssh_pass` hanya dibutuhkan untuk **initial setup** saat SSH key belum ada di server. Setelah SSH key ter-deploy, hapus password dari secrets.yml!
 
 ---
 
-### 3. Encrypt Secrets (Recommended)
+### 3. Encrypt Secrets (Wajib!)
 
 ```bash
 # Encrypt secrets.yml
 ansible-vault encrypt secrets.yml
 
-# Masukkan password, ingat password ini!
+# Masukkan password vault, INGAT PASSWORD INI!
+New Vault password: 
+Confirm New Vault password:
+```
+
+Setelah di-encrypt, isi file akan terlihat seperti:
+```
+$ANSIBLE_VAULT;1.1;AES256
+61626364656667686970...
+```
+
+---
+
+### Ansible Vault Commands (Manage Secrets)
+
+| Command | Fungsi |
+|---------|--------|
+| `ansible-vault encrypt secrets.yml` | Encrypt file |
+| `ansible-vault decrypt secrets.yml` | Decrypt file (untuk edit) |
+| `ansible-vault edit secrets.yml` | Edit langsung tanpa decrypt manual |
+| `ansible-vault view secrets.yml` | Lihat isi tanpa decrypt |
+| `ansible-vault rekey secrets.yml` | Ganti password vault |
+
+#### Encrypt (pertama kali)
+```bash
+ansible-vault encrypt secrets.yml
+```
+
+#### Decrypt (untuk edit manual)
+```bash
+# Decrypt
+ansible-vault decrypt secrets.yml
+
+# Edit seperti biasa
+nano secrets.yml
+
+# Encrypt lagi setelah selesai
+ansible-vault encrypt secrets.yml
+```
+
+#### Edit langsung (tanpa decrypt manual)
+```bash
+# Lebih aman - file tetap encrypted setelah save
+ansible-vault edit secrets.yml
+```
+
+#### View tanpa decrypt
+```bash
+ansible-vault view secrets.yml
+```
+
+#### Ganti password vault
+```bash
+ansible-vault rekey secrets.yml
 ```
 
 ---
@@ -79,10 +141,10 @@ ansible-vault encrypt secrets.yml
 
 ```bash
 # Test semua server
-ansible all -m ping
+ansible all -m ping --ask-vault-pass
 
 # Atau pakai playbook
-ansible-playbook test-connection.yml
+ansible-playbook test-connection.yml --ask-vault-pass
 ```
 
 ---
@@ -90,21 +152,77 @@ ansible-playbook test-connection.yml
 ### 5. Deploy SSH Key
 
 ```bash
-# Tanpa vault (jika secrets tidak encrypted)
-ansible-playbook setup-ssh.yml
-
-# Dengan vault (jika secrets encrypted)
+# Dengan vault password
 ansible-playbook setup-ssh.yml --ask-vault-pass
 
 # Dry run dulu (check mode)
-ansible-playbook setup-ssh.yml --check
+ansible-playbook setup-ssh.yml --check --ask-vault-pass
 
 # Hanya server tertentu
-ansible-playbook setup-ssh.yml --limit gitlab
+ansible-playbook setup-ssh.yml --limit gitlab --ask-vault-pass
 
 # Beberapa server
-ansible-playbook setup-ssh.yml --limit "gitlab,jenkins,k8s-master"
+ansible-playbook setup-ssh.yml --limit "gitlab,jenkins,k8s-master" --ask-vault-pass
 ```
+
+---
+
+## Initial Setup (SSH Key Belum Ada di Server)
+
+Jika ini **pertama kali** dan SSH key belum ter-deploy ke server (masih pakai password):
+
+### Option 1: Password di secrets.yml (Recommended)
+
+1. Tambahkan password ke `secrets.yml`:
+```yaml
+---
+ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5XXXXXX your-email"
+
+# Password untuk initial setup
+ansible_ssh_pass: "password-ssh-kamu"
+ansible_become_pass: "password-sudo-kamu"
+```
+
+2. Encrypt secrets:
+```bash
+ansible-vault encrypt secrets.yml
+```
+
+3. Run playbook:
+```bash
+ansible-playbook setup-ssh.yml --ask-vault-pass
+```
+
+4. **Setelah berhasil**, hapus password dari secrets:
+```bash
+ansible-vault edit secrets.yml
+# Hapus baris ansible_ssh_pass dan ansible_become_pass
+```
+
+### Option 2: Password via Command Line
+
+```bash
+# Install sshpass dulu
+sudo apt install sshpass -y
+
+# Run dengan prompt password
+ansible-playbook setup-ssh.yml --ask-pass --ask-become-pass
+```
+
+- `--ask-pass` → prompt password SSH
+- `--ask-become-pass` → prompt password sudo
+
+### Option 3: Password Berbeda per Server
+
+Jika setiap server punya password berbeda, tambahkan di `inventory.ini`:
+
+```ini
+[all_servers]
+vm1 ansible_host=192.168.246.20 ansible_user=user1 ansible_ssh_pass=pass1
+vm2 ansible_host=192.168.246.31 ansible_user=user2 ansible_ssh_pass=pass2
+```
+
+⚠️ **Kurang secure** — gunakan hanya untuk initial setup, lalu hapus.
 
 ---
 
@@ -149,23 +267,85 @@ monitoring ansible_host=192.168.246.36 ansible_user=admin
 
 ---
 
-## Ansible Vault Commands
+## Ansible Vault Commands (Detail)
+
+### Encrypt File (Pertama Kali)
 
 ```bash
-# Encrypt file
 ansible-vault encrypt secrets.yml
+```
 
-# Decrypt file (untuk edit)
+Output:
+```
+New Vault password: 
+Confirm New Vault password:
+Encryption successful
+```
+
+### Decrypt File (Untuk Edit Manual)
+
+```bash
+# Decrypt dulu
 ansible-vault decrypt secrets.yml
 
-# Edit encrypted file langsung
+# Edit seperti biasa
+nano secrets.yml
+
+# JANGAN LUPA encrypt lagi!
+ansible-vault encrypt secrets.yml
+```
+
+### Edit Langsung (Recommended)
+
+```bash
+# File tetap encrypted setelah save
 ansible-vault edit secrets.yml
+```
 
-# View encrypted file
+Akan membuka editor (default: vim). Setelah save & quit, file otomatis encrypted lagi.
+
+**Ganti editor default:**
+```bash
+# Pakai nano
+EDITOR=nano ansible-vault edit secrets.yml
+
+# Set permanent di .bashrc
+echo 'export EDITOR=nano' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### View Tanpa Decrypt
+
+```bash
 ansible-vault view secrets.yml
+```
 
-# Change password
+### Ganti Password Vault
+
+```bash
 ansible-vault rekey secrets.yml
+```
+
+### Simpan Password di File (Opsional)
+
+Supaya tidak perlu ketik password terus:
+
+```bash
+# Buat file password
+echo "your-vault-password" > .vault_pass
+chmod 600 .vault_pass
+
+# Tambahkan ke .gitignore
+echo ".vault_pass" >> .gitignore
+
+# Run tanpa prompt
+ansible-playbook setup-ssh.yml --vault-password-file .vault_pass
+```
+
+Atau set di `ansible.cfg`:
+```ini
+[defaults]
+vault_password_file = .vault_pass
 ```
 
 ---
