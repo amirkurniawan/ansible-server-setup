@@ -11,8 +11,16 @@ ansible-ssh-setup/
 ├── ansible.cfg          # Ansible configuration
 ├── inventory.ini        # Daftar 7 VMs (EDIT INI)
 ├── group_vars/
-│   └── all.yml          # Public variables
-├── secrets.yml          # SSH key & secrets (ENCRYPT INI)
+│   └── all.yml          # Public variables (semua server)
+├── host_vars/           # Variables per server (password berbeda)
+│   ├── vm1.yml          # Password vm1 (ENCRYPT INI)
+│   ├── vm2.yml          # Password vm2 (ENCRYPT INI)
+│   ├── vm3.yml          # Password vm3 (ENCRYPT INI)
+│   ├── vm4.yml          # Password vm4 (ENCRYPT INI)
+│   ├── vm5.yml          # Password vm5 (ENCRYPT INI)
+│   ├── vm6.yml          # Password vm6 (ENCRYPT INI)
+│   └── vm7.yml          # Password vm7 (ENCRYPT INI)
+├── secrets.yml          # SSH public key (ENCRYPT INI)
 ├── setup-ssh.yml        # Main playbook
 ├── test-connection.yml  # Test koneksi
 └── README.md
@@ -212,17 +220,81 @@ ansible-playbook setup-ssh.yml --ask-pass --ask-become-pass
 - `--ask-pass` → prompt password SSH
 - `--ask-become-pass` → prompt password sudo
 
-### Option 3: Password Berbeda per Server
+### Option 3: Password Berbeda per Server (host_vars)
 
-Jika setiap server punya password berbeda, tambahkan di `inventory.ini`:
+Jika setiap server punya password berbeda, gunakan **host_vars**:
 
-```ini
-[all_servers]
-vm1 ansible_host=192.168.246.20 ansible_user=user1 ansible_ssh_pass=pass1
-vm2 ansible_host=192.168.246.31 ansible_user=user2 ansible_ssh_pass=pass2
+```
+ansible-ssh-setup/
+├── host_vars/
+│   ├── vm1.yml    ← Password untuk vm1
+│   ├── vm2.yml    ← Password untuk vm2
+│   ├── vm3.yml    ← Password untuk vm3
+│   ├── vm4.yml    ← Password untuk vm4
+│   ├── vm5.yml    ← Password untuk vm5
+│   ├── vm6.yml    ← Password untuk vm6
+│   └── vm7.yml    ← Password untuk vm7
 ```
 
-⚠️ **Kurang secure** — gunakan hanya untuk initial setup, lalu hapus.
+#### Step 1: Edit setiap file host_vars
+
+```bash
+nano host_vars/vm1.yml
+```
+
+```yaml
+---
+ansible_ssh_pass: "password-untuk-vm1"
+ansible_become_pass: "sudo-password-vm1"
+```
+
+```bash
+nano host_vars/vm2.yml
+```
+
+```yaml
+---
+ansible_ssh_pass: "password-untuk-vm2"
+ansible_become_pass: "sudo-password-vm2"
+```
+
+... ulangi untuk vm3 - vm7
+
+#### Step 2: Encrypt semua host_vars
+
+```bash
+# Encrypt semua sekaligus dengan password yang SAMA
+ansible-vault encrypt host_vars/*.yml
+
+# Atau satu-satu
+ansible-vault encrypt host_vars/vm1.yml
+ansible-vault encrypt host_vars/vm2.yml
+# ... dst
+```
+
+#### Step 3: Run playbook
+
+```bash
+ansible-playbook setup-ssh.yml --ask-vault-pass
+```
+
+#### Edit password tertentu
+
+```bash
+# Edit password vm1
+ansible-vault edit host_vars/vm1.yml
+
+# View tanpa edit
+ansible-vault view host_vars/vm3.yml
+```
+
+#### Decrypt semua (jika perlu)
+
+```bash
+ansible-vault decrypt host_vars/*.yml
+```
+
+> ⚠️ **Tips:** Gunakan vault password yang SAMA untuk semua file supaya mudah manage.
 
 ---
 
@@ -231,8 +303,19 @@ vm2 ansible_host=192.168.246.31 ansible_user=user2 ansible_ssh_pass=pass2
 | File | Apa yang Diedit |
 |------|-----------------|
 | `inventory.ini` | IP address dan username setiap VM |
-| `secrets.yml` | Isi SSH public key kamu |
+| `secrets.yml` | SSH public key |
+| `host_vars/vm*.yml` | Password SSH per server (jika berbeda) |
 | `group_vars/all.yml` | Path ke SSH key (jika berbeda) |
+
+---
+
+## Password Options Summary
+
+| Skenario | Solusi | File |
+|----------|--------|------|
+| Password **sama** semua server | Tambah di `secrets.yml` | `secrets.yml` |
+| Password **beda** tiap server | Pakai `host_vars/` | `host_vars/vm1.yml`, `vm2.yml`, ... |
+| **Tanpa** simpan password | Pakai `--ask-pass` flag | - |
 
 ---
 
