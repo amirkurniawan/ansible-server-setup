@@ -3,8 +3,8 @@
 # Cek koneksi ke semua server sebelum deploy
 #
 # Usage:
-#   ansible-playbook test-connection.yml
-#   ansible-playbook test-connection.yml --limit vm1
+#   ansible-playbook test-connection.yml --ask-vault-pass
+#   ansible-playbook test-connection.yml --limit vm1 --ask-vault-pass
 
 - name: Test SSH Connection to All Servers
   hosts: all_servers
@@ -12,6 +12,12 @@
 
   vars_files:
     - group_vars/all.yml
+    - secrets.yml
+
+  # Use password from secrets.yml for initial setup
+  vars:
+    ansible_ssh_pass: "{{ ansible_ssh_pass | default(omit) }}"
+    ansible_become_pass: "{{ ansible_become_pass | default(omit) }}"
 
   tasks:
     - name: Ping test
